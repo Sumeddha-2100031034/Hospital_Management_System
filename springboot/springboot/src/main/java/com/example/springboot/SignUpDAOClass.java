@@ -1,6 +1,8 @@
  package com.example.springboot;
 
+import java.time.LocalDate;
 import java.util.Optional;
+import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -14,7 +16,7 @@ public class SignUpDAOClass implements SignUpDAO{
 	@Autowired
 	public SignUpRepository sr;
 	
-	@Override
+	
 	public void insertdata(SignUp sp) {
 		// TODO Auto-generated method stub
 		sr.save(sp);
@@ -24,12 +26,22 @@ public class SignUpDAOClass implements SignUpDAO{
 		// TODO Auto-generated method stub
 		return sr.findById(email);
 	}
-
-	/*@Override
-	public SignUp checklogin(String email, String pwd) {
+	
+	public SignUp findByEmailAndPassword(String email, String password) {
 		// TODO Auto-generated method stub
-		return sr.checklogin(email);
-		
+		return sr.findByEmailAndPassword(email, password);
 	}
-	*/
+
+	public SignUp findByEmail(String email) {
+		// TODO Auto-generated method stub
+		return sr.findByEmail(email);
+	}
+	
+	public String generateUniquePatientId() {
+        String patientId;
+        do {
+            patientId = UUID.randomUUID().toString();
+        } while (sr.existsByPatientId(patientId));
+        return patientId;
+    }
 }

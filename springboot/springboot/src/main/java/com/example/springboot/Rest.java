@@ -16,11 +16,22 @@ public class Rest {
     private final AppointmentDAOClass adc;
     private final SignUpDAOClass sdc;
     private final PaymentDAOClass pdc;
+    private final MailService mailService;
+    
     @Autowired
-    public Rest(AppointmentDAOClass adc, SignUpDAOClass sdc,PaymentDAOClass pdc) {
+    private SignUpRepository sr;
+    
+    @Autowired
+    public Rest(AppointmentDAOClass adc, SignUpDAOClass sdc,PaymentDAOClass pdc, MailService mailService) {
         this.adc = adc;
         this.sdc = sdc;
         this.pdc = pdc;
+		this.mailService = mailService;
+    }
+    
+    @GetMapping("/")
+    public String showMainPage() {
+    	return "home";
     }
 
     @GetMapping("/home")
@@ -34,8 +45,41 @@ public class Rest {
     }
     
     @GetMapping("/profile")
-    public String showProfilePage() {
+    public String showProfilePage(Model model, HttpSession session) {
+        String email = (String) session.getAttribute("email");
+        if (email != null) {
+            SignUp user = sr.findByEmail(email);
+            if (user != null) {
+                model.addAttribute("email", user.getEmail());
+                model.addAttribute("patientId", user.getPatientId());
+                model.addAttribute("dob", user.getDob());
+                model.addAttribute("mobile", user.getMobile());
+                model.addAttribute("name", user.getName());
+            }
+        }
         return "profile";
+    }
+
+    @PostMapping("/update_profile")
+    public String updateProfile(@ModelAttribute("sp2") SignUp updatedUser, Model model, HttpSession session) {
+        String email = (String) session.getAttribute("email");
+        if (email != null) {
+            SignUp existingUser = sr.findByEmail(email);
+            if (existingUser != null) {
+                existingUser.setName(updatedUser.getName());
+                existingUser.setDob(updatedUser.getDob());
+                existingUser.setMobile(updatedUser.getMobile());
+
+                // Generate and set Patient ID if not already present
+                if (existingUser.getPatientId() == null || existingUser.getPatientId().isEmpty()) {
+                    existingUser.setPatientId(sdc.generateUniquePatientId());
+                }
+
+                // Save the updated user object
+                sr.save(existingUser);
+            }
+        }
+        return "redirect:/profile"; // Redirect to the profile page after update
     }
     
     @GetMapping("/specialities")
@@ -140,41 +184,52 @@ public class Rest {
         adc.insertDetails(user);
         return "home";
     }
+   
     
     @GetMapping("/signup")
     public String signup(Model model) {
         model.addAttribute("sp2", new SignUp());
         return "signup";
     }
-    
+    @PostMapping("/login")
+    public String login(@ModelAttribute("sp3") SignUp user, Model model, HttpSession session) {
+        String email = user.getEmail();
+        String password = user.getPassword();
+        System.out.println("Login attempt: " + email + ", " + password);
+
+        if (email == null || email.isEmpty() || password == null || password.isEmpty()) {
+            System.out.println("Login failed: Email or password is empty");
+            model.addAttribute("error", "Email and password must not be empty");
+            return "login"; // Render the login page again with an error message
+        }
+
+        SignUp obj = sr.findByEmailAndPassword(email, password);
+        if (obj != null) {
+            System.out.println("Login successful"); 
+            session.setAttribute("profile", obj);
+            return "redirect:/profile";
+        } else {
+            System.out.println("Login failed: Incorrect email or password");
+            model.addAttribute("error", "Incorrect email or password");
+            return "login"; // Render the login page again with an error message
+        }
+    }
+
+
 
     @PostMapping("/add_patient")
     public String addPatient(@ModelAttribute("sp2") SignUp user2, Model model) {
         model.addAttribute("sp1", user2);
         sdc.insertdata(user2);
-        return "home";
+        return "redirect:/home";
     }
     
     @GetMapping("/login")
     public String showloginPage(Model model) {
-    	model.addAttribute("sp3", new Login());
+    	model.addAttribute("sp3", new SignUp());
         return "login";
     }
     
-    @PostMapping("/check")
-    public String login(@ModelAttribute("sp3") Login user3, Model model) {
-        String email = user3.getEmail();
-        String pswd = user3.getPwd();
-        Optional<SignUp> l = sdc.findpatbyId(email);
-        SignUp l1 = l.orElse(new SignUp()); // You should handle the case where l is empty.
-        if (l.isPresent() && pswd.equals(l1.getConfpassword())) {
-            // Successful login, you can set session variables here
-            return "index"; // Redirect to the index page after successful login
-        } else {
-            model.addAttribute("loginFailed", true);
-            return "error"; // Redirect back to the login page with a message
-        }
-    }
 
     
     @GetMapping("/payment")
@@ -189,36 +244,4 @@ public class Rest {
         pdc.insertDetails(user);
         return "home";
     }
-    
-  /*  @Autowired
-    NotificationManager M; // Inject NotificationManager
-
-    // Chatbot endpoint
-    @PostMapping("/chatbot/chat")
-    public String chat(@RequestParam String message) {
-        String senderEmail = "your_email@gmail.com"; // Set your email here
-        String toEmail = "recipient_email@gmail.com"; // Set recipient's email here
-
-        String subject = "Chatbot Response";
-        String response = "Chatbot received message: " + message;
-
-        M.sendEmail(senderEmail, toEmail, subject, response);
-
-        // You can return a response or redirect to another page
-        return "chatbot_response_page"; // Change to the appropriate page
-    }*/
-    
-   /* @GetMapping("/med")
-    public String showMedPage() {
-        return "med";
-    }
-
-    @PostMapping("/example")
-    public String processExampleForm(@RequestParam("paramName") String paramValue) {
-        // Handle the form submission here
-        // You can access the submitted data using the 'paramValue' parameter
-        // You can perform any necessary processing and return an appropriate response page.
-        return "example"; // For example, you can redirect back to the "example" page with a success message.
-    }
-*/
 }
